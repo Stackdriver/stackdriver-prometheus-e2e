@@ -37,8 +37,7 @@ items:
         containers:
         - name: prometheus
           image: gcr.io/prometheus-to-sd/stackdriver-prometheus:master
-          # Uncomment this to enable k8s_* resource types. Requires a Stackdriver whitelist.
-          #args: ["--config.file=/etc/prometheus/prometheus.yml", "--stackdriver.k8s-resource-types"]
+          # Uncomment this to enable debug logs. Can be very verbose.
           args: ["--config.file=/etc/prometheus/prometheus.yml", "--log.level=debug"]
           # Helps during development, when reusing the tag.
           imagePullPolicy: Always
@@ -59,9 +58,9 @@ items:
       # Source: https://github.com/stackdriver/prometheus/blob/master/documentation/examples/prometheus.yml
       global:
         external_labels:
+          _stackdriver_project_id: '{{.ProjectID}}'
           _kubernetes_cluster_name: '{{.Cluster}}'
           _kubernetes_location: '{{.Location}}'
-          _kubernetes_project_id_or_name: '{{.ProjectID}}'
 
       # Scrape config for nodes (kubelet).
       #
@@ -116,18 +115,6 @@ items:
           regex: ([^:]+)(?::\d+)?;(\d+)
           replacement: $1:$2
           target_label: __address__
-        - source_labels: [__meta_kubernetes_namespace]
-          action: replace
-          target_label: _kubernetes_namespace
-        - source_labels: [__meta_kubernetes_pod_name]
-          action: replace
-          target_label: _kubernetes_pod_name
-        - source_labels: [__meta_kubernetes_pod_node_name]
-          action: replace
-          target_label: _kubernetes_pod_node_name
-        - source_labels: [__meta_kubernetes_pod_container_name]
-          action: replace
-          target_label: _kubernetes_pod_container_name
 
       # Scrape config for service endpoints.
       #
@@ -162,18 +149,6 @@ items:
           target_label: __address__
           regex: ([^:]+)(?::\d+)?;(\d+)
           replacement: $1:$2
-        - source_labels: [__meta_kubernetes_namespace]
-          action: replace
-          target_label: _kubernetes_namespace
-        - source_labels: [__meta_kubernetes_pod_name]
-          action: replace
-          target_label: _kubernetes_pod_name
-        - source_labels: [__meta_kubernetes_pod_node_name]
-          action: replace
-          target_label: _kubernetes_pod_node_name
-        - source_labels: [__meta_kubernetes_pod_container_name]
-          action: replace
-          target_label: _kubernetes_pod_container_name
 
       remote_write:
       - url: "https://monitoring.googleapis.com:443/"
