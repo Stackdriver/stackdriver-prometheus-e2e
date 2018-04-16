@@ -134,13 +134,13 @@ func TestE2E(t *testing.T) {
 			stackdriverService,
 			projectID,
 			&monitoring.MonitoredResource{
-				Type: "gke_container",
+				Type: "k8s_container",
 				Labels: map[string]string{
 					"project_id":     projectID,
 					"cluster_name":   *clusterName,
-					"namespace_id":   namespaceName,
+					"namespace_name": namespaceName,
 					"container_name": containerName,
-					"zone":           clusterLocation,
+					"location":       clusterLocation,
 				},
 			}, &monitoring.Metric{
 				Type: "custom.googleapis.com/up",
