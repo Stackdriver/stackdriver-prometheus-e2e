@@ -68,6 +68,11 @@ func fetchFloat64Metric(service *monitoring.Service, projectID string, resource 
 			log.Printf("ListTimeSeriesRequest: %v", request)
 			response, err := request.Do()
 			if err != nil {
+				// TODO(jkohen): switch to gRPC and use error utils to get the response.
+				if strings.Contains(err.Error(), "Error 400") {
+					// The metric doesn't exist, but it may still show up.
+					return err
+				}
 				return backoff.Permanent(err)
 			}
 			log.Printf("ListTimeSeriesResponse: %v", response)
