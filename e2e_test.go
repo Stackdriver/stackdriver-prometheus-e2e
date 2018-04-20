@@ -143,7 +143,7 @@ func TestE2E(t *testing.T) {
 					"location":       clusterLocation,
 				},
 			}, &monitoring.Metric{
-				Type: "custom.googleapis.com/up",
+				Type: "external.googleapis.com/prometheus/up",
 			})
 		if err != nil {
 			t.Fatalf("Failed to fetch metric: %v", err)
