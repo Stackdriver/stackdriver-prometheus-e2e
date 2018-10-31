@@ -33,8 +33,9 @@ import (
 )
 
 var (
-	clusterName = flag.String("cluster-name", "", "the name of the cluster used by kubectl in the context where this test runs")
-	integration = flag.Bool("integration", false, "whether to run integration tests")
+	clusterName     = flag.String("cluster-name", "", "the name of the cluster used by kubectl in the context where this test runs")
+	integration     = flag.Bool("integration", false, "whether to run integration tests")
+	startPrometheus = flag.Bool("start-prometheus", true, "whether to run a Prometheus Server that writes to Stackdriver")
 )
 
 const (
@@ -106,8 +107,10 @@ func TestE2E(t *testing.T) {
 	if err := execKubectl("apply", "--namespace", namespaceName, "-f", rbacFilename, "--as=admin", "--as-group=system:masters"); err != nil {
 		t.Fatalf("Failed to run kubectl: %v", err)
 	}
-	if err := execKubectl("create", "--namespace", namespaceName, "-f", promFilename); err != nil {
-		t.Fatalf("Failed to run kubectl: %v", err)
+	if *startPrometheus {
+		if err := execKubectl("create", "--namespace", namespaceName, "-f", promFilename); err != nil {
+			t.Fatalf("Failed to run kubectl: %v", err)
+		}
 	}
 	defer func() {
 		if err := execKubectl("delete", "namespace", namespaceName); err != nil {
