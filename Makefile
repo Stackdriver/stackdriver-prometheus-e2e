@@ -19,6 +19,6 @@ test-integration:
 ifndef CLUSTER_NAME
   $(error CLUSTER_NAME is undefined)
 endif
-	go test ./... -args -integration -cluster-name $(CLUSTER_NAME) -start-prometheus $(START_PROMETHEUS)
+	go test ./... -args -integration -cluster-name=$(CLUSTER_NAME) -start-prometheus=$(START_PROMETHEUS)
 
 .PHONY: all test-integration
