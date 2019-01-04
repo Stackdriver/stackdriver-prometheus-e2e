@@ -11,14 +11,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-START_PROMETHEUS=true
-
 all: test-integration
 
 test-integration:
-ifndef CLUSTER_NAME
-  $(error CLUSTER_NAME is undefined)
-endif
-	go test ./... -args -integration -cluster-name=$(CLUSTER_NAME) -start-prometheus=$(START_PROMETHEUS)
+	go test ./... -args -integration -cluster-location=$(GCP_REGION) -cluster-name=$(KUBE_CLUSTER) -namespace-name=$(KUBE_NAMESPACE) -project-id=$(GCP_PROJECT)
 
 .PHONY: all test-integration

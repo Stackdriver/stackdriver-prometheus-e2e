@@ -14,110 +14,44 @@ limitations under the License.
 package integration
 
 import (
-	"bytes"
 	"context"
 	"flag"
-	"fmt"
-	"io/ioutil"
-	"log"
-	"math/rand"
-	"os"
-	"os/exec"
-	"strings"
 	"testing"
-	"text/template"
-	"time"
 
 	"golang.org/x/oauth2/google"
 	monitoring "google.golang.org/api/monitoring/v3"
 )
 
 var (
+	clusterLocation = flag.String("cluster-location", "", "the location of the cluster used by kubectl in the context where this test runs")
 	clusterName     = flag.String("cluster-name", "", "the name of the cluster used by kubectl in the context where this test runs")
+	namespaceName   = flag.String("namespace-name", "", "the name of the namespace used by kubectl in the context where this test runs")
+	projectID       = flag.String("project-id", "", "the project ID used by kubectl in the context where this test runs")
 	integration     = flag.Bool("integration", false, "whether to run integration tests")
-	startPrometheus = flag.Bool("start-prometheus", true, "whether to run a Prometheus Server that writes to Stackdriver")
 )
-
-const (
-	clusterLocation = "us-central1-a"
-	projectID       = "prometheus-to-sd"
-)
-
-func execKubectl(args ...string) error {
-	kubectlPath := "kubectl" // Assume in PATH
-	cmd := exec.Command(kubectlPath, args...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	human := strings.Join(cmd.Args, " ")
-	log.Printf("Running command: %s", human)
-	err := cmd.Run()
-	if err != nil {
-		log.Println("kubectl stdout:\n", stdout.String())
-		log.Println("kubectl stderr:\n", stderr.String())
-	}
-	return err
-}
-
-func translateTemplate(templateFilename string, data interface{}) (string, error) {
-	f, err := ioutil.TempFile("", "e2e-")
-	if err != nil {
-		return "", fmt.Errorf("cannot create temporary file: %v", err)
-	}
-	tmpl := template.Must(template.ParseFiles(templateFilename))
-	if err = tmpl.Execute(f, data); err != nil {
-		return "", fmt.Errorf("failed to execute template: %v", err)
-	}
-	if err = f.Close(); err != nil {
-		return "", fmt.Errorf("failed to write to temporary file: %v", err)
-	}
-	return f.Name(), nil
-}
 
 func TestE2E(t *testing.T) {
 	if !*integration {
 		t.Skip("skipping integration test: disabled")
 	}
+	if *clusterLocation == "" {
+		t.Fatalf("the cluster location must not be empty")
+	}
+	t.Logf("Cluster location: %s", *clusterLocation)
 	if *clusterName == "" {
 		t.Fatalf("the cluster name must not be empty")
 	}
 	t.Logf("Cluster name: %s", *clusterName)
-	namespaceName := fmt.Sprintf("e2e-%x", rand.Uint64())
-	t.Logf("Namespace name: %s", namespaceName)
-	if err := execKubectl("create", "namespace", namespaceName); err != nil {
-		t.Fatalf("Failed to run kubectl: %v", err)
+	if *namespaceName == "" {
+		t.Fatalf("the namespace name must not be empty")
 	}
-	templateData := map[string]string{
-		"Cluster":   *clusterName,
-		"Location":  clusterLocation,
-		"Namespace": namespaceName,
-		"ProjectID": projectID,
+	t.Logf("Namespace name: %s", *namespaceName)
+	if *projectID == "" {
+		t.Fatalf("the project ID must not be empty")
 	}
-	rbacFilename, err := translateTemplate("rbac-setup.yml.tmpl", templateData)
-	if err != nil {
-		t.Fatalf("Cannot generate required rbac-setup.yml file: %v", err)
-	}
-	defer os.Remove(rbacFilename)
-	promFilename, err := translateTemplate("prometheus-service.yml.tmpl", templateData)
-	if err != nil {
-		t.Fatalf("Cannot generate required prometheus-service.yml file: %v", err)
-	}
-	defer os.Remove(promFilename)
-
-	if err := execKubectl("apply", "--namespace", namespaceName, "-f", rbacFilename, "--as=admin", "--as-group=system:masters"); err != nil {
-		t.Fatalf("Failed to run kubectl: %v", err)
-	}
-	if *startPrometheus {
-		if err := execKubectl("create", "--namespace", namespaceName, "-f", promFilename); err != nil {
-			t.Fatalf("Failed to run kubectl: %v", err)
-		}
-	}
-	defer func() {
-		if err := execKubectl("delete", "namespace", namespaceName); err != nil {
-			t.Logf("Failed to run kubectl: %v", err)
-		}
-	}()
-	const containerName = "prometheus" // From prometheus-service.yml.
+	t.Logf("Project ID: %s", *projectID)
+	// Container name launched by stackdriver-prometheus-sidecar/kube/full/deploy.sh.
+	const containerName = "kube-state-metrics"
 	t.Run("gke_container", func(t *testing.T) {
 		client, err := google.DefaultClient(
 			context.Background(), monitoring.MonitoringReadScope)
@@ -131,19 +65,19 @@ func TestE2E(t *testing.T) {
 		t.Logf("Successfully created Stackdriver client")
 		// We don't provide "instance_id" and "pod_id" labels because
 		// they're generated automatically by the managed
-		// deployment. "namespace_id" should be sufficient to uniquely
+		// deployment. "namespace_name" should be sufficient to uniquely
 		// identify the time series.
 		value, err := fetchFloat64Metric(
 			stackdriverService,
-			projectID,
+			*projectID,
 			&monitoring.MonitoredResource{
 				Type: "k8s_container",
 				Labels: map[string]string{
-					"project_id":     projectID,
+					"project_id":     *projectID,
 					"cluster_name":   *clusterName,
-					"namespace_name": namespaceName,
+					"namespace_name": *namespaceName,
 					"container_name": containerName,
-					"location":       clusterLocation,
+					"location":       *clusterLocation,
 				},
 			}, &monitoring.Metric{
 				Type: "external.googleapis.com/prometheus/up",
@@ -155,8 +89,4 @@ func TestE2E(t *testing.T) {
 			t.Errorf("expected metric value %v, got %v", 1, value)
 		}
 	})
-}
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
 }
