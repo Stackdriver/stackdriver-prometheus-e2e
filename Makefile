@@ -14,6 +14,6 @@
 all: test-integration
 
 test-integration:
-	go test ./... -args -integration -cluster-location=$(GCP_REGION) -cluster-name=$(KUBE_CLUSTER) -namespace-name=$(KUBE_NAMESPACE) -project-id=$(GCP_PROJECT)
+	go test -mod=vendor ./... -args -integration -cluster-location=$(GCP_REGION) -cluster-name=$(KUBE_CLUSTER) -namespace-name=$(KUBE_NAMESPACE) -project-id=$(GCP_PROJECT)
 
 .PHONY: all test-integration
